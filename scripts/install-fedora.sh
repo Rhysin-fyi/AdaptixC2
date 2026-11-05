@@ -52,6 +52,22 @@ done
 client_source="$repo_root/AdaptixClient/client-dist/AdaptixClient-x86_64.AppImage"
 server_source="$repo_root/AdaptixServer/server-dist"
 
+ensure_installed_server_stopped() {
+    local installed_server="$install_dir/server/adaptixserver"
+    [[ -e "$installed_server" ]] || return 0
+
+    local proc_exe pid running_path
+    for proc_exe in /proc/[0-9]*/exe; do
+        running_path="$(readlink "$proc_exe" 2>/dev/null || true)"
+        running_path="${running_path% (deleted)}"
+        if [[ "$proc_exe" -ef "$installed_server" || "$running_path" == "$installed_server" ]]; then
+            pid="${proc_exe#/proc/}"
+            pid="${pid%/exe}"
+            fail "Adaptix server PID $pid is running from $install_dir; stop it with $install_dir/run-adaptix.sh stop before installing"
+        fi
+    done
+}
+
 if [[ "$build" == true ]]; then
     "$repo_root/scripts/build-fedora.sh" all
 fi
@@ -63,6 +79,11 @@ command -v openssl >/dev/null 2>&1 || fail "install OpenSSL with: sudo dnf insta
 
 client_dir="$install_dir/client"
 server_dir="$install_dir/server"
+
+# Replacing a loaded extender in place can invalidate executable mappings and
+# crash the Go process. This also catches foreground servers without a PID file.
+ensure_installed_server_stopped
+
 mkdir -p "$client_dir" "$server_dir/extenders"
 
 printf '[*] Installing client...\n'
