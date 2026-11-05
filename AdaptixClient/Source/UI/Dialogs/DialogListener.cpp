@@ -4,6 +4,35 @@
 #include <Client/Storage.h>
 #include <Client/AxScript/AxElementWrappers.h>
 
+namespace {
+
+QString platformDisplayName(const QString &platform)
+{
+    if (platform == "windows") return "Windows";
+    if (platform == "linux") return "Linux";
+    if (platform == "macos") return "macOS";
+    return platform;
+}
+
+QString agentSupportSummary(const QList<ListenerAgentSupport> &support)
+{
+    if (support.isEmpty())
+        return "No compatible agents registered";
+
+    QStringList entries;
+    for (const auto &agent : support) {
+        QStringList platforms;
+        for (const QString &platform : agent.platforms)
+            platforms.append(platformDisplayName(platform));
+
+        const QString targets = platforms.isEmpty() ? "targets not declared" : platforms.join(", ");
+        entries.append(QString("%1 — %2").arg(agent.name, targets));
+    }
+    return entries.join(";  ");
+}
+
+} // namespace
+
 DialogListener::DialogListener(QWidget *parent) : QDialog(parent)
 {
     this->createUI();
@@ -54,6 +83,10 @@ void DialogListener::createUI()
     listenerLabel = new QLabel(this);
     listenerLabel->setText("Config:");
     listenerCombobox = new QComboBox(this);
+
+    agentSupportLabel = new QLabel(this);
+    agentSupportLabel->setWordWrap(true);
+    agentSupportLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
 
     menuContext = new QMenu(this);
     menuContext->addAction("Rename", this, &DialogListener::onProfileRename);
@@ -128,11 +161,13 @@ void DialogListener::createUI()
     leftPanelLayout->addWidget( listenerLabel,          1, 2);
     leftPanelLayout->addWidget( listenerCombobox,       1, 3);
 
-    leftPanelLayout->addWidget( listenerConfigGroupbox, 2, 0, 1, 4);
+    leftPanelLayout->addWidget( agentSupportLabel,      2, 1, 1, 3);
+    leftPanelLayout->addWidget( listenerConfigGroupbox, 3, 0, 1, 4);
 
     leftPanelLayout->setRowStretch(0, 0);
     leftPanelLayout->setRowStretch(1, 0);
-    leftPanelLayout->setRowStretch(2, 1);
+    leftPanelLayout->setRowStretch(2, 0);
+    leftPanelLayout->setRowStretch(3, 1);
     leftPanelLayout->setColumnStretch(0, 0);
     leftPanelLayout->setColumnStretch(1, 1);
     leftPanelLayout->setColumnStretch(2, 0);
@@ -182,13 +217,15 @@ void DialogListener::Start()
     this->show();
 }
 
-void DialogListener::AddExListeners(const QList<RegListenerConfig> &listeners, const QMap<QString, AxUI> &uis)
+void DialogListener::AddExListeners(const QList<RegListenerConfig> &listeners, const QMap<QString, AxUI> &uis,
+                                    const QMap<QString, QList<ListenerAgentSupport>> &support)
 {
     listenerCombobox->clear();
     listenerTypeCombobox->clear();
 
     this->listeners = listeners;
     this->ax_uis    = uis;
+    this->agentSupport = support;
 
     QSet<QString> listenersSet;
 
@@ -202,11 +239,14 @@ void DialogListener::AddExListeners(const QList<RegListenerConfig> &listeners, c
 
         configStackWidget->addWidget(ax_ui->widget);
         listenerCombobox->addItem(listener.name);
+        listenerCombobox->setItemData(listenerCombobox->count() - 1,
+            "Compatible agents: " + agentSupportSummary(agentSupport.value(listener.name)), Qt::ToolTipRole);
         QString type = listener.type + " (" + listener.protocol + ")";
         listenersSet.insert(type);
     }
     listenerTypeCombobox->addItem("any");
     listenerTypeCombobox->addItems(QList<QString>(listenersSet.begin(), listenersSet.end()));
+    updateAgentSupport(listenerCombobox->currentText());
 }
 
 void DialogListener::SetProfile(const AuthProfile &profile)
@@ -243,6 +283,27 @@ void DialogListener::changeConfig(const QString &fn)
             configStackWidget->setCurrentWidget(ax_ui->widget);
         this->resize(ax_ui->width, ax_ui->height);
     }
+    updateAgentSupport(fn);
+}
+
+void DialogListener::updateAgentSupport(const QString &listenerName)
+{
+    const QList<ListenerAgentSupport> support = agentSupport.value(listenerName);
+    bool metadataComplete = !support.isEmpty();
+    for (const auto &agent : support)
+        metadataComplete = metadataComplete && !agent.platforms.isEmpty();
+
+    agentSupportLabel->setText("Compatible agents: " + agentSupportSummary(support));
+    if (support.isEmpty()) {
+        agentSupportLabel->setStyleSheet("color: #f44747;");
+        agentSupportLabel->setToolTip("No registered agent extender supports this listener type.");
+    } else if (!metadataComplete) {
+        agentSupportLabel->setStyleSheet("color: #d7ba7d;");
+        agentSupportLabel->setToolTip("At least one compatible agent did not publish platform metadata. Check its documentation before building.");
+    } else {
+        agentSupportLabel->setStyleSheet("color: #6a9955;");
+        agentSupportLabel->setToolTip("Agents and target platforms compatible with the selected listener config.");
+    }
 }
 
 void DialogListener::changeType(const QString &type)
@@ -250,8 +311,11 @@ void DialogListener::changeType(const QString &type)
     listenerCombobox->clear();
     for (auto listener : listeners) {
         QString listenerType = listener.type + " (" + listener.protocol + ")";
-        if (listenerType == type || type == "any")
+        if (listenerType == type || type == "any") {
             listenerCombobox->addItem(listener.name);
+            listenerCombobox->setItemData(listenerCombobox->count() - 1,
+                "Compatible agents: " + agentSupportSummary(agentSupport.value(listener.name)), Qt::ToolTipRole);
+        }
     }
 }
 

@@ -8,6 +8,25 @@
 #include <Client/AxScript/AxElementWrappers.h>
 #include <Client/AxScript/AxScriptManager.h>
 
+namespace {
+
+QMap<QString, QList<ListenerAgentSupport>> buildAgentSupport(AdaptixWidget *adaptixWidget,
+                                                             const QList<RegListenerConfig> &listeners)
+{
+    QMap<QString, QList<ListenerAgentSupport>> support;
+    for (const auto &listener : listeners) {
+        QList<ListenerAgentSupport> compatibleAgents;
+        for (const QString &agentName : adaptixWidget->GetAgentNames(listener.name)) {
+            const AgentTypeInfo typeInfo = adaptixWidget->GetAgentTypeInfo(agentName);
+            compatibleAgents.append(ListenerAgentSupport{agentName, typeInfo.platforms});
+        }
+        support.insert(listener.name, compatibleAgents);
+    }
+    return support;
+}
+
+} // namespace
+
 REGISTER_DOCK_WIDGET(ListenersWidget, "Listeners", true)
 
 ListenersWidget::ListenersWidget(AdaptixWidget* w) : DockTab("Listeners", w->GetProfile()->GetProject(), ":/icons/listeners"), adaptixWidget(w)
@@ -275,7 +294,7 @@ void ListenersWidget::onCreateListener() const
     DialogListener* dialogListener = new DialogListener();
     dialogListener->setAttribute(Qt::WA_DeleteOnClose);
     dialogListener->SetProfile( *(adaptixWidget->GetProfile()) );
-    dialogListener->AddExListeners(listeners, ax_uis);
+    dialogListener->AddExListeners(listeners, ax_uis, buildAgentSupport(adaptixWidget, listeners));
     dialogListener->Start();
 }
 
@@ -372,7 +391,7 @@ void ListenersWidget::onEditListener() const
     dialogListener->setAttribute(Qt::WA_DeleteOnClose);
     dialogListener->SetEditMode(listenerName);
     dialogListener->SetProfile( *(adaptixWidget->GetProfile()) );
-    dialogListener->AddExListeners(listeners, ax_uis);
+    dialogListener->AddExListeners(listeners, ax_uis, buildAgentSupport(adaptixWidget, listeners));
     dialogListener->Start();
 }
 

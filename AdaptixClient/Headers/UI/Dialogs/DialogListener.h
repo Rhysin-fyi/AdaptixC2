@@ -8,6 +8,11 @@
 
 class AxContainerWrapper;
 
+struct ListenerAgentSupport {
+    QString     name;
+    QStringList platforms;
+};
+
 class DialogListener : public QDialog
 {
 Q_OBJECT
@@ -24,6 +29,7 @@ Q_OBJECT
     QComboBox*      listenerCombobox       = nullptr;
     QLabel*         listenerTypeLabel      = nullptr;
     QComboBox*      listenerTypeCombobox   = nullptr;
+    QLabel*         agentSupportLabel      = nullptr;
     QPushButton*    buttonCreate           = nullptr;
     QPushButton*    buttonNewProfile       = nullptr;
     QPushButton*    buttonLoad             = nullptr;
@@ -38,6 +44,7 @@ Q_OBJECT
 
     QList<RegListenerConfig> listeners;
     QMap<QString, AxUI> ax_uis;
+    QMap<QString, QList<ListenerAgentSupport>> agentSupport;
 
     AuthProfile authProfile;
     bool        editMode = false;
@@ -46,12 +53,14 @@ Q_OBJECT
     void createUI();
     void loadProfiles();
     void saveProfile(const QString &profileName, const QString &configName, const QString &configType, const QString &configData);
+    void updateAgentSupport(const QString &listenerName);
 
 public:
     explicit DialogListener(QWidget *parent = nullptr);
     ~DialogListener() override;
 
-    void AddExListeners(const QList<RegListenerConfig> &listeners, const QMap<QString, AxUI> &uis);
+    void AddExListeners(const QList<RegListenerConfig> &listeners, const QMap<QString, AxUI> &uis,
+                        const QMap<QString, QList<ListenerAgentSupport>> &support);
     void SetProfile(const AuthProfile &profile);
     void Start();
     void SetEditMode(const QString &name);
