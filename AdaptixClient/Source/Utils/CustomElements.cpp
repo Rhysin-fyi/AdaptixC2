@@ -5,8 +5,133 @@
 #include <QHBoxLayout>
 #include <QMouseEvent>
 #include <QPainter>
+#include <array>
+#include <optional>
 #include <Utils/CustomElements.h>
 #include <Utils/NonBlockingDialogs.h>
+
+namespace {
+
+struct AnsiStyle {
+    std::optional<QColor> foreground;
+    std::optional<QColor> background;
+    QFont::Weight weight = QFont::Normal;
+    bool italic = false;
+    bool underline = false;
+    bool strikeOut = false;
+    bool inverse = false;
+};
+
+const std::array<QColor, 8> AnsiColors = {
+    QColor("#000000"), QColor("#cd3131"), QColor("#0dbc79"), QColor("#e5e510"),
+    QColor("#2472c8"), QColor("#bc3fbc"), QColor("#11a8cd"), QColor("#e5e5e5")
+};
+
+const std::array<QColor, 8> AnsiBrightColors = {
+    QColor("#666666"), QColor("#f14c4c"), QColor("#23d18b"), QColor("#f5f543"),
+    QColor("#3b8eea"), QColor("#d670d6"), QColor("#29b8db"), QColor("#ffffff")
+};
+
+QColor ansi256Color(const int index)
+{
+    if (index < 8)
+        return AnsiColors[index];
+    if (index < 16)
+        return AnsiBrightColors[index - 8];
+    if (index < 232) {
+        const int value = index - 16;
+        const int red = value / 36;
+        const int green = (value / 6) % 6;
+        const int blue = value % 6;
+        const auto component = [](const int level) { return level == 0 ? 0 : 55 + level * 40; };
+        return QColor(component(red), component(green), component(blue));
+    }
+
+    const int gray = 8 + (qBound(232, index, 255) - 232) * 10;
+    return QColor(gray, gray, gray);
+}
+
+QTextCharFormat ansiFormat(const AnsiStyle& style, const QPalette& palette)
+{
+    QTextCharFormat format;
+    format.setFontWeight(style.weight);
+    format.setFontItalic(style.italic);
+    format.setFontUnderline(style.underline);
+    format.setFontStrikeOut(style.strikeOut);
+
+    if (style.inverse) {
+        format.setForeground(style.background.value_or(palette.color(QPalette::Base)));
+        format.setBackground(style.foreground.value_or(palette.color(QPalette::Text)));
+    } else {
+        if (style.foreground)
+            format.setForeground(*style.foreground);
+        if (style.background)
+            format.setBackground(*style.background);
+    }
+    return format;
+}
+
+void applyAnsiSgr(const QList<int>& params, AnsiStyle& style)
+{
+    for (int i = 0; i < params.size(); ++i) {
+        const int code = params[i];
+        if (code == 0) {
+            style = AnsiStyle();
+        } else if (code == 1) {
+            style.weight = QFont::Bold;
+        } else if (code == 2) {
+            style.weight = QFont::Light;
+        } else if (code == 3) {
+            style.italic = true;
+        } else if (code == 4) {
+            style.underline = true;
+        } else if (code == 7) {
+            style.inverse = true;
+        } else if (code == 9) {
+            style.strikeOut = true;
+        } else if (code == 22) {
+            style.weight = QFont::Normal;
+        } else if (code == 23) {
+            style.italic = false;
+        } else if (code == 24) {
+            style.underline = false;
+        } else if (code == 27) {
+            style.inverse = false;
+        } else if (code == 29) {
+            style.strikeOut = false;
+        } else if (code >= 30 && code <= 37) {
+            style.foreground = AnsiColors[code - 30];
+        } else if (code == 39) {
+            style.foreground.reset();
+        } else if (code >= 40 && code <= 47) {
+            style.background = AnsiColors[code - 40];
+        } else if (code == 49) {
+            style.background.reset();
+        } else if (code >= 90 && code <= 97) {
+            style.foreground = AnsiBrightColors[code - 90];
+        } else if (code >= 100 && code <= 107) {
+            style.background = AnsiBrightColors[code - 100];
+        } else if ((code == 38 || code == 48) && i + 2 < params.size() && params[i + 1] == 5) {
+            const QColor color = ansi256Color(qBound(0, params[i + 2], 255));
+            if (code == 38)
+                style.foreground = color;
+            else
+                style.background = color;
+            i += 2;
+        } else if ((code == 38 || code == 48) && i + 4 < params.size() && params[i + 1] == 2) {
+            const QColor color(qBound(0, params[i + 2], 255),
+                               qBound(0, params[i + 3], 255),
+                               qBound(0, params[i + 4], 255));
+            if (code == 38)
+                style.foreground = color;
+            else
+                style.background = color;
+            i += 4;
+        }
+    }
+}
+
+} // namespace
 
 
 VerticalTabBar::VerticalTabBar(QWidget *parent) : QWidget(parent)
@@ -754,6 +879,71 @@ void TextEditConsole::insertChunks(const QList<FormattedChunk>& chunks)
 void TextEditConsole::appendPlain(const QString& text)
 {
     appendChunk(text, QTextCharFormat());
+}
+
+void TextEditConsole::appendAnsi(const QString& text)
+{
+    AnsiStyle style;
+    int plainStart = 0;
+    int index = 0;
+
+    const auto appendRange = [&](const int start, const int length) {
+        if (length > 0)
+            appendChunk(text.mid(start, length), ansiFormat(style, palette()));
+    };
+
+    while (index < text.size()) {
+        const bool escapeCsi = text[index] == QChar(0x1b)
+            && index + 1 < text.size() && text[index + 1] == '[';
+        const bool singleCsi = text[index] == QChar(0x9b);
+        if (!escapeCsi && !singleCsi) {
+            ++index;
+            continue;
+        }
+
+        const int sequenceStart = index;
+        int cursor = index + (escapeCsi ? 2 : 1);
+        while (cursor < text.size() && text[cursor].unicode() >= 0x20 && text[cursor].unicode() <= 0x3f)
+            ++cursor;
+
+        if (cursor >= text.size()) {
+            // Drop an incomplete control sequence instead of rendering the ESC glyph.
+            appendRange(plainStart, sequenceStart - plainStart);
+            return;
+        }
+
+        const ushort finalByte = text[cursor].unicode();
+        if (finalByte < 0x40 || finalByte > 0x7e) {
+            ++index;
+            continue;
+        }
+
+        appendRange(plainStart, sequenceStart - plainStart);
+
+        if (text[cursor] == 'm') {
+            const int paramsStart = sequenceStart + (escapeCsi ? 2 : 1);
+            const QString paramsText = text.mid(paramsStart, cursor - paramsStart);
+            QList<int> params;
+            if (paramsText.isEmpty()) {
+                params.append(0);
+            } else {
+                const QStringList values = paramsText.split(';', Qt::KeepEmptyParts);
+                for (const QString& value : values) {
+                    bool ok = false;
+                    const int parameter = value.toInt(&ok);
+                    params.append(ok ? parameter : 0);
+                }
+            }
+            applyAnsiSgr(params, style);
+        }
+
+        // Non-SGR CSI sequences are terminal cursor/control operations. They are
+        // intentionally discarded because a text viewer cannot safely apply them.
+        index = cursor + 1;
+        plainStart = index;
+    }
+
+    appendRange(plainStart, text.size() - plainStart);
 }
 
 void TextEditConsole::flushPending()

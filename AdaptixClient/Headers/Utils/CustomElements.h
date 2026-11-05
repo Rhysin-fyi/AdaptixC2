@@ -493,6 +493,7 @@ public:
     explicit TextEditConsole(QWidget* parent = nullptr, int maxLines = 50000, bool noWrap = true, bool autoScroll = false);
 
     void appendPlain(const QString& text);
+    void appendAnsi(const QString& text);
     void appendFormatted(const QString& text, const std::function<void(QTextCharFormat&)> &styleFn);
 
     void appendColor(const QString& text, QColor color);

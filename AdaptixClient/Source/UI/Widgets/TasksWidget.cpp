@@ -20,7 +20,7 @@ void TaskOutputWidget::createUI()
     inputMessage->setStyleSheet("background-color: #151515; color: #BEBEBE; border: 1px solid #2A2A2A; padding: 4px; border-radius: 4px;");
     inputMessage->setFont( FontManager::instance().getFont("Hack") );
 
-    outputTextEdit = new QTextEdit(this);
+    outputTextEdit = new TextEditConsole(this, 50000, false, true);
     outputTextEdit->setReadOnly(true);
     outputTextEdit->setWordWrapMode(QTextOption::WrapAnywhere);
     outputTextEdit->setStyleSheet("background-color: #151515; color: #BEBEBE; border: 1px solid #2A2A2A; border-radius: 4px;");
@@ -43,8 +43,11 @@ void TaskOutputWidget::SetConten(const QString &message, const QString &text) co
 
     if ( text.isEmpty() )
         outputTextEdit->clear();
-    else
-        outputTextEdit->setText( TrimmedEnds(text) );
+    else {
+        outputTextEdit->clear();
+        outputTextEdit->appendAnsi(TrimmedEnds(text));
+        outputTextEdit->flushAll();
+    }
 }
 
 

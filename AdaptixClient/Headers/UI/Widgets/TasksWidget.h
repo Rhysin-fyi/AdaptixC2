@@ -33,7 +33,7 @@ class TaskOutputWidget : public QWidget
     QGridLayout* mainGridLayout = nullptr;
     QLabel*      label          = nullptr;
     QLineEdit*   inputMessage   = nullptr;
-    QTextEdit*   outputTextEdit = nullptr;
+    TextEditConsole* outputTextEdit = nullptr;
 
     void createUI();
 

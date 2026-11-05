@@ -248,11 +248,11 @@ void ConsoleWidget::ConsoleOutputMessage(const qint64 timestamp, const QString &
         QString printMessage = TrimmedEnds(message);
         if ( text.isEmpty() || type == CONSOLE_OUT_LOCAL_INFO || type == CONSOLE_OUT_LOCAL_SUCCESS || type == CONSOLE_OUT_LOCAL_ERROR || type == CONSOLE_OUT_SUCCESS || type == CONSOLE_OUT_ERROR)
             printMessage += "\n";
-        OutputTextEdit->appendPlain(printMessage);
+        OutputTextEdit->appendAnsi(printMessage);
     }
 
     if ( !text.isEmpty() )
-        OutputTextEdit->appendPlain( TrimmedEnds(text) + "\n");
+        OutputTextEdit->appendAnsi( TrimmedEnds(text) + "\n");
 
     if (completed) {
         QString deleter = "\n+-------------------------------------------------------------------------------------+\n";
