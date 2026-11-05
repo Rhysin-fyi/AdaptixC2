@@ -136,6 +136,7 @@ func (ex *AdaptixExtender) LoadPluginAgent(config_path string, config_data []byt
 		AX:             string(ax_content),
 		Listeners:      configAgent.Listeners,
 		MultiListeners: configAgent.MultiListeners,
+		Platforms:      configAgent.Platforms,
 	}
 
 	plugin_path := filepath.Dir(config_path) + "/" + configAgent.ExtenderFile

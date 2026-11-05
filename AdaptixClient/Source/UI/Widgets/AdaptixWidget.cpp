@@ -666,14 +666,22 @@ static CommandsGroup parseCommandsGroup(const QString &scriptName, const QJsonAr
     return cg;
 }
 
-void AdaptixWidget::RegisterAgentConfig(const QString &agentName, const QString &ax_script, const QStringList &listeners, const bool &multiListeners, const QJsonArray &groups)
+void AdaptixWidget::RegisterAgentConfig(const QString &agentName, const QString &ax_script, const QStringList &listeners, const bool &multiListeners, const QStringList &platforms, const QJsonArray &groups)
 {
-    AgentTypes[agentName] = AgentTypeInfo{multiListeners, listeners};
+    AgentTypes[agentName] = AgentTypeInfo{multiListeners, listeners, platforms};
 
     ScriptManager->AgentScriptAdd(agentName, ax_script);
 
+    QList<int> supportedOs;
+    if (platforms.isEmpty() || platforms.contains("windows"))
+        supportedOs.append(OS_WINDOWS);
+    if (platforms.isEmpty() || platforms.contains("linux"))
+        supportedOs.append(OS_LINUX);
+    if (platforms.isEmpty() || platforms.contains("macos"))
+        supportedOs.append(OS_MAC);
+
     for (const auto &listener : listeners) {
-        for (int os : {OS_WINDOWS, OS_LINUX, OS_MAC}) {
+        for (int os : supportedOs) {
             Commander* commander = new Commander();
             commander->SetAgentType(agentName);
 
@@ -859,7 +867,7 @@ QList<QString> AdaptixWidget::GetAgentNames(const QString &listenerType) const
 
 AgentTypeInfo AdaptixWidget::GetAgentTypeInfo(const QString &agentName) const
 {
-    return AgentTypes.value(agentName, AgentTypeInfo{false, QStringList()});
+    return AgentTypes.value(agentName, AgentTypeInfo{false, QStringList(), QStringList()});
 }
 
 RegAgentConfig AdaptixWidget::GetRegAgent(const QString &agentName, const QString &listenerName, const int os)

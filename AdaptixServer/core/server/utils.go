@@ -277,6 +277,7 @@ type SyncPackerAgentReg struct {
 	AX             string           `json:"ax"`
 	Listeners      []string         `json:"listeners"`
 	MultiListeners bool             `json:"multi_listeners"`
+	Platforms      []string         `json:"platforms"`
 	Groups         []AxCommandBatch `json:"groups"`
 }
 

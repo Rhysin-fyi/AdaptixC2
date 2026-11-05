@@ -179,7 +179,7 @@ func CreateSpListenerStop(name string) SyncPackerListenerStop {
 
 /// AGENT
 
-func CreateSpAgentReg(agent string, ax string, listeners []string, multiListeners bool, groups []AxCommandBatch) SyncPackerAgentReg {
+func CreateSpAgentReg(agent string, ax string, listeners []string, multiListeners bool, platforms []string, groups []AxCommandBatch) SyncPackerAgentReg {
 	return SyncPackerAgentReg{
 		SpType: TYPE_AGENT_REG,
 
@@ -187,6 +187,7 @@ func CreateSpAgentReg(agent string, ax string, listeners []string, multiListener
 		AX:             ax,
 		Listeners:      listeners,
 		MultiListeners: multiListeners,
+		Platforms:      platforms,
 		Groups:         groups,
 	}
 }

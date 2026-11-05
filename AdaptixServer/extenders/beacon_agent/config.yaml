@@ -10,3 +10,5 @@ listeners:
   - "BeaconSMB"
   - "BeaconDNS"
 multi_listeners: false
+platforms:
+  - "windows"

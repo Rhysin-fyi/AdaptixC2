@@ -258,7 +258,7 @@ func (ts *Teamserver) TsPresyncExtenders() []interface{} {
 	ts.agent_configs.ForEach(func(key string, value interface{}) bool {
 		agentInfo := value.(extender.AgentInfo)
 		groups := ts.TsGetAgentCommandGroups(agentInfo.Name)
-		p := CreateSpAgentReg(agentInfo.Name, agentInfo.AX, agentInfo.Listeners, agentInfo.MultiListeners, groups)
+		p := CreateSpAgentReg(agentInfo.Name, agentInfo.AX, agentInfo.Listeners, agentInfo.MultiListeners, agentInfo.Platforms, groups)
 		packets = append(packets, p)
 		return true
 	})

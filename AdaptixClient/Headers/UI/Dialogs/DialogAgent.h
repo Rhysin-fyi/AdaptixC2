@@ -24,6 +24,7 @@ Q_OBJECT
     QWidget*        listenerSelectionWidget = nullptr;
     QLabel*         agentLabel          = nullptr;
     QComboBox*      agentCombobox       = nullptr;
+    QLabel*         platformSupportLabel = nullptr;
     QLabel*         profileLabel        = nullptr;
     QAction*        actionSaveProfile   = nullptr;
     QLineEdit*      inputProfileName    = nullptr;
@@ -61,6 +62,7 @@ Q_OBJECT
     void loadProfiles();
     void saveProfile(const QString &profileName, const QString &agentName, const QString &configData);
     QString generateUniqueProfileName(const QString &baseName);
+    void updatePlatformSupport(const QString &agentName);
 
 public:
     explicit DialogAgent(AdaptixWidget* adaptixWidget, const QString &listenerName, const QString &listenerType);

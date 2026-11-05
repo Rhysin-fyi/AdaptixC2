@@ -54,6 +54,7 @@ typedef struct RegAgentConfig {
 typedef struct AgentTypeInfo {
     bool        multiListeners;
     QStringList listenerTypes;
+    QStringList platforms;
 } AgentTypeInfo;
 
 struct ServerScriptInfo {
@@ -191,7 +192,7 @@ public:
     void ClearNotificationsStream();
 
     void RegisterListenerConfig(const QString &name, const QString &protocol, const QString &type, const QString &ax_script);
-    void RegisterAgentConfig(const QString &agentName, const QString &ax_script, const QStringList &listenersconst, const bool &multiListeners, const QJsonArray &groups);
+    void RegisterAgentConfig(const QString &agentName, const QString &ax_script, const QStringList &listenersconst, const bool &multiListeners, const QStringList &platforms, const QJsonArray &groups);
     void RegisterServiceConfig(const QString &serviceName, const QString &ax_script);
     void ProcessAxScriptPacket(const QString &name, const QString &content, const QJsonArray &groups);
     void registerServerCommandGroups(const QString &scriptName, const QList<ServerScriptGroup> &groups, QJSEngine* engine);

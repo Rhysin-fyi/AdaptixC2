@@ -666,7 +666,10 @@ void AdaptixWidget::processSyncPacket(QJsonObject jsonObj)
         QStringList listeners;
         for (const QJsonValue &listener : jsonObj["listeners"].toArray())
             listeners.append(listener.toString());
-        this->RegisterAgentConfig(jsonObj["agent"].toString(), jsonObj["ax"].toString(), listeners, jsonObj["multi_listeners"].toBool(), jsonObj["groups"].toArray());
+        QStringList platforms;
+        for (const QJsonValue &platform : jsonObj["platforms"].toArray())
+            platforms.append(platform.toString().toLower());
+        this->RegisterAgentConfig(jsonObj["agent"].toString(), jsonObj["ax"].toString(), listeners, jsonObj["multi_listeners"].toBool(), platforms, jsonObj["groups"].toArray());
         break;
     }
 

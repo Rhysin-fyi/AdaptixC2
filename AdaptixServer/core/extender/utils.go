@@ -34,6 +34,7 @@ type ExConfigAgent struct {
 	AgentWatermark string   `yaml:"agent_watermark"`
 	Listeners      []string `yaml:"listeners"`
 	MultiListeners bool     `yaml:"multi_listeners"`
+	Platforms      []string `yaml:"platforms"`
 }
 
 /// ExConfig Service
@@ -61,6 +62,7 @@ type AgentInfo struct {
 	AX             string
 	Listeners      []string
 	MultiListeners bool
+	Platforms      []string
 }
 
 type ServiceInfo struct {

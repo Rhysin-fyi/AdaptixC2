@@ -10,6 +10,38 @@
 #include <QJSEngine>
 #include <QWidgetAction>
 
+namespace {
+
+QString platformDisplayName(const QString& platform)
+{
+    if (platform == "windows") return "Windows";
+    if (platform == "linux") return "Linux";
+    if (platform == "macos") return "macOS";
+    return platform;
+}
+
+QString platformSummary(const QStringList& platforms)
+{
+    if (platforms.isEmpty())
+        return "Not declared by extender";
+
+    QStringList displayNames;
+    for (const QString& platform : platforms)
+        displayNames.append(platformDisplayName(platform));
+    return displayNames.join("  •  ");
+}
+
+QJsonObject buildConfigObject(const QString& configData)
+{
+    QJsonParseError error;
+    const QJsonDocument document = QJsonDocument::fromJson(configData.toUtf8(), &error);
+    if (error.error == QJsonParseError::NoError && document.isObject())
+        return document.object();
+    return {};
+}
+
+} // namespace
+
 void DialogAgent::createUI()
 {
     this->setWindowTitle("Generate Agent");
@@ -65,6 +97,10 @@ void DialogAgent::createUI()
 
     agentLabel    = new QLabel("Agent:", this);
     agentCombobox = new QComboBox(this);
+
+    platformSupportLabel = new QLabel(this);
+    platformSupportLabel->setWordWrap(true);
+    platformSupportLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
 
     profileLabel = new QLabel("Profile:", this);
 
@@ -137,15 +173,17 @@ void DialogAgent::createUI()
     leftPanelLayout->addWidget(agentLabel,          1, 0);
     leftPanelLayout->addWidget(agentCombobox,       1, 1);
 
-    leftPanelLayout->addWidget(profileLabel,        2, 0);
-    leftPanelLayout->addWidget(inputProfileName,    2, 1);
+    leftPanelLayout->addWidget(platformSupportLabel, 2, 1);
 
-    leftPanelLayout->addWidget(agentConfigGroupbox, 3, 0, 1, 2);
+    leftPanelLayout->addWidget(profileLabel,        3, 0);
+    leftPanelLayout->addWidget(inputProfileName,    3, 1);
+
+    leftPanelLayout->addWidget(agentConfigGroupbox, 4, 0, 1, 2);
 
     leftPanelLayout->setRowStretch(0, 0);
     leftPanelLayout->setRowStretch(1, 0);
     leftPanelLayout->setRowStretch(2, 0);
-    leftPanelLayout->setRowStretch(3, 1);
+    leftPanelLayout->setRowStretch(4, 1);
     leftPanelLayout->setColumnStretch(0, 0);
     leftPanelLayout->setColumnStretch(1, 1);
 
@@ -275,7 +313,12 @@ void DialogAgent::AddExAgents(const QStringList &agents, const QMap<QString, AxU
         configStackWidget->addWidget(ax_ui->widget);
 
         agentCombobox->addItem(agent);
+        const AgentTypeInfo typeInfo = agentTypes.value(agent, AgentTypeInfo{false, QStringList(), QStringList()});
+        agentCombobox->setItemData(agentCombobox->count() - 1,
+            "Supported targets: " + platformSummary(typeInfo.platforms), Qt::ToolTipRole);
     }
+
+    updatePlatformSupport(agentCombobox->currentText());
 }
 
 void DialogAgent::SetProfile(const AuthProfile &profile)
@@ -478,7 +521,9 @@ void DialogAgent::changeConfig(const QString &agentName)
         }
     }
 
-    AgentTypeInfo typeInfo = agentTypes.value(agentName, AgentTypeInfo{false, QStringList()});
+    updatePlatformSupport(agentName);
+
+    AgentTypeInfo typeInfo = agentTypes.value(agentName, AgentTypeInfo{false, QStringList(), QStringList()});
     bool isMultiListeners = typeInfo.multiListeners;
     listenerSelectionWidget->setVisible(isMultiListeners);
     listenerInput->setVisible(!isMultiListeners);
@@ -507,6 +552,21 @@ void DialogAgent::changeConfig(const QString &agentName)
     QString baseName = agentName;
     if (!profileNameManuallyEdited)
         inputProfileName->setText(generateUniqueProfileName(baseName));
+}
+
+void DialogAgent::updatePlatformSupport(const QString &agentName)
+{
+    const AgentTypeInfo typeInfo = agentTypes.value(agentName, AgentTypeInfo{false, QStringList(), QStringList()});
+    if (typeInfo.platforms.isEmpty()) {
+        platformSupportLabel->setText("Supported targets: Not declared by extender");
+        platformSupportLabel->setStyleSheet("color: #d7ba7d;");
+        platformSupportLabel->setToolTip("This agent did not publish platform compatibility metadata. Check its documentation before building.");
+        return;
+    }
+
+    platformSupportLabel->setText("Supported targets: " + platformSummary(typeInfo.platforms));
+    platformSupportLabel->setStyleSheet("color: #6a9955;");
+    platformSupportLabel->setToolTip("Platforms explicitly declared by the selected agent extender.");
 }
 
 void DialogAgent::loadProfiles()
@@ -740,7 +800,8 @@ void DialogAgent::onButtonBuild()
     }
 
     QStringList selectedListeners;
-    bool isMultiListeners = agentTypes.value(agentName, AgentTypeInfo{false, QStringList()}).multiListeners;
+    const AgentTypeInfo typeInfo = agentTypes.value(agentName, AgentTypeInfo{false, QStringList(), QStringList()});
+    bool isMultiListeners = typeInfo.multiListeners;
     if (isMultiListeners) {
         for (int i = 0; i < listenerListWidget->count(); ++i) {
             auto *item = listenerListWidget->item(i);
@@ -756,10 +817,33 @@ void DialogAgent::onButtonBuild()
         selectedListeners.append(listenerName);
     }
 
+    const QJsonObject configObject = buildConfigObject(configData);
+    QString targetPlatform = configObject.value("os").toString().toLower();
+    if (targetPlatform.isEmpty() && typeInfo.platforms.size() == 1)
+        targetPlatform = typeInfo.platforms.first();
+
+    if (!targetPlatform.isEmpty() && !typeInfo.platforms.isEmpty() && !typeInfo.platforms.contains(targetPlatform)) {
+        MessageError(QString("%1 does not support %2. Supported targets: %3")
+            .arg(agentName, platformDisplayName(targetPlatform), platformSummary(typeInfo.platforms)));
+        return;
+    }
+
     buildLogOutput->clear();
     buildLogPanel->setVisible(true);
     buildLogOutput->setVisible(true);
     collapseButton->setIcon(QIcon(":/icons/arrow_drop_down"));
+
+    QStringList buildDetails;
+    buildDetails.append("Agent: " + agentName);
+    buildDetails.append("Target: " + (targetPlatform.isEmpty() ? QString("Not declared") : platformDisplayName(targetPlatform)));
+    const QString architecture = configObject.value("arch").toString();
+    const QString format = configObject.value("format").toString();
+    if (!architecture.isEmpty()) buildDetails.append("Architecture: " + architecture);
+    if (!format.isEmpty()) buildDetails.append("Format: " + format);
+    buildLogOutput->append(QString("<span style='color: #569cd6;'>[*]</span> %1")
+        .arg(buildDetails.join(" | ").toHtmlEscaped()));
+    buildLogOutput->append(QString("<span style='color: #569cd6;'>[*]</span> Listeners: %1")
+        .arg(selectedListeners.join(", ").toHtmlEscaped()));
 
     buildButton->setText("Stop");
 
@@ -777,7 +861,7 @@ void DialogAgent::onButtonBuild()
     QString otp;
     bool otpResult = HttpReqGetOTP("channel_agent_build", otpData, authProfile.GetURL(), authProfile.GetAccessToken(), &otp);
     if (!otpResult) {
-        buildButton->setText("Build");
+        buildButton->setText("Generate");
         MessageError("Failed to generate OTP for build");
         return;
     }
@@ -883,7 +967,7 @@ void DialogAgent::onBuildFinished()
 {
     buildLogOutput->append("----- Build process finished -----");
 
-    buildButton->setText("Build");
+    buildButton->setText("Generate");
 
     buildWorker = nullptr;
     buildThread = nullptr;
@@ -908,7 +992,7 @@ void DialogAgent::stopBuild()
 
         buildLogPanel->setVisible(false);
 
-        buildButton->setText("Build");
+        buildButton->setText("Generate");
     });
 
     QMetaObject::invokeMethod(worker, "stop", Qt::QueuedConnection);
@@ -921,7 +1005,7 @@ void DialogAgent::onListenerSelectionChanged(const QListWidgetItem *item)
     updateListenerDisplay();
 
     QString agentName = agentCombobox->currentText();
-    if (agentName.isEmpty() || !agentTypes.value(agentName, AgentTypeInfo{false, QStringList()}).multiListeners)
+    if (agentName.isEmpty() || !agentTypes.value(agentName, AgentTypeInfo{false, QStringList(), QStringList()}).multiListeners)
         return;
 
     QStringList selectedListeners;

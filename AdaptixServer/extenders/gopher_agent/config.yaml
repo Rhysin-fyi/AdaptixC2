@@ -7,3 +7,7 @@ agent_watermark: "904e5493"
 listeners:
   - "GopherTCP"
 multi_listeners: true
+platforms:
+  - "windows"
+  - "linux"
+  - "macos"
