@@ -94,6 +94,12 @@ install -m 0755 "$server_source/adaptixserver" "$server_dir/adaptixserver"
 install -m 0644 "$server_source/404page.html" "$server_dir/404page.html"
 cp -a "$server_source/extenders/." "$server_dir/extenders/"
 
+telec2_dir="$server_dir/extenders/telec2_service"
+if [[ -f "$telec2_dir/telec2-config.example.json" && ! -f "$telec2_dir/telec2-config.json" ]]; then
+    install -m 0600 "$telec2_dir/telec2-config.example.json" "$telec2_dir/telec2-config.json"
+    printf '[+] Created private TeleC2 configuration placeholder: %s\n' "$telec2_dir/telec2-config.json"
+fi
+
 extension_kit_installed=false
 if [[ -f "$extension_kit_source/extension-kit.axs" ]]; then
     if ! find "$extension_kit_source" -type f -path '*/_bin/*.o' -print -quit | grep -q .; then

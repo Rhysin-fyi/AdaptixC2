@@ -20,13 +20,15 @@ with another process will cause missed replies.
 
 ## Adaptix setup
 
-After building and installing the extenders:
+The Fedora installer creates a private configuration placeholder automatically.
+Edit it after installation:
 
 ```bash
-cd install/server/extenders/telec2_service
-cp telec2-config.example.json telec2-config.json
-chmod 600 telec2-config.json
+$EDITOR install/server/extenders/telec2_service/telec2-config.json
 ```
+
+For a non-Fedora/manual installation, copy `telec2-config.example.json` to
+`telec2-config.json` beside the service plugin and run `chmod 600` on it.
 
 Edit `telec2-config.json`, then add this extender config to the server profile:
 
