@@ -1,0 +1,4 @@
+[submodule "Extension-Kit"]
+	path = Extension-Kit
+	url = https://github.com/Rhysin-fyi/adaptix-linux-extension-kit.git
+	branch = feat/linux-extension-kit
