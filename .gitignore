@@ -17,6 +17,7 @@ AdaptixClient/*.log
 AdaptixClient/cmake_*
 AdaptixClient/Makefile
 AdaptixServer/build_error.log
+AdaptixServer/extenders/telec2_service/telec2-config.json
 
 # CMake generated files in kddockwidgets
 AdaptixClient/Libs/kddockwidgets/CMakeFiles/

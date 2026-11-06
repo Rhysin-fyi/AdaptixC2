@@ -56,6 +56,22 @@ client nickname may be any value.
 * Beacon Agent
 * TCP/mTLS Gopher Listener
 * Gopher Agent
+* Local TeleC2 transfer service (optional configuration required)
+
+
+## TeleC2 Transfer Panel
+
+The local Fedora branch includes an optional TeleC2 service dock for sending an
+operator-selected file to an authorized TeleC2 endpoint through a dedicated
+Telegram operator bot. The panel shows the destination platform, file size,
+confirmation prompt, upload result, SHA-256 digest and TeleC2 replies without
+requiring a separate Telegram window.
+
+The service performs transfer and status operations only; it does not execute
+uploaded files. Telegram tokens and destination identifiers belong in the
+mode-`0600` runtime configuration and are never committed. See
+[`AdaptixServer/extenders/telec2_service/README.md`](AdaptixServer/extenders/telec2_service/README.md)
+for setup instructions.
 
 
 

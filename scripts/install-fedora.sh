@@ -125,6 +125,17 @@ else
     printf '[*] Preserving existing profile and password.\n'
 fi
 
+telec2_config='extenders/telec2_service/config.yaml'
+if [[ -f "$server_dir/$telec2_config" ]] &&
+   ! grep -Eq '^[[:space:]]*-[[:space:]]*"extenders/telec2_service/config\.yaml"[[:space:]]*$' "$server_dir/profile.yaml"; then
+    if grep -Eq '^[[:space:]]*extenders:[[:space:]]*$' "$server_dir/profile.yaml"; then
+        sed -i '/^[[:space:]]*extenders:[[:space:]]*$/a\    - "extenders/telec2_service/config.yaml"' "$server_dir/profile.yaml"
+        printf '[+] TeleC2 service enabled in the server profile.\n'
+    else
+        printf '[!] TeleC2 service was built but the profile has no extenders section; add %s manually.\n' "$telec2_config" >&2
+    fi
+fi
+
 only_password="$(awk '/^[[:space:]]*only_password:/ {print $2; exit}' "$server_dir/profile.yaml")"
 
 if [[ "$extension_kit_installed" == true ]] &&

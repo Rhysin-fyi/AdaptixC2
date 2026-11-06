@@ -1,0 +1,14 @@
+{
+  "operator_bot_token": "REPLACE_WITH_A_DEDICATED_OPERATOR_BOT_TOKEN",
+  "max_file_size_mb": 20,
+  "poll_timeout_seconds": 20,
+  "destinations": [
+    {
+      "name": "lab-linux",
+      "chat_id": -1001234567890,
+      "telec2_bot_id": 123456789,
+      "telec2_bot_username": "example_telec2_bot",
+      "platform": "linux"
+    }
+  ]
+}

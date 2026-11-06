@@ -1,0 +1,5 @@
+extender_type: "service"
+extender_file: "telec2_service.so"
+ax_file: "telec2.axs"
+service_name: "TeleC2"
+service_config: "telec2-config.json"
