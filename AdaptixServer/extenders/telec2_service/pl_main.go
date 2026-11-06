@@ -61,6 +61,19 @@ type Plugin struct {
 	mu        sync.RWMutex
 	config    Config
 	configErr error
+	states    map[string]connectionState
+	operator  operatorIdentity
+}
+
+type connectionState struct {
+	State       string
+	LastSeen    time.Time
+	LastMessage string
+}
+
+type operatorIdentity struct {
+	ID       int64
+	Username string
 }
 
 type commandArgs struct {
@@ -110,6 +123,7 @@ func InitPlugin(rawTeamserver any, moduleDir string, serviceConfig string) adapt
 		moduleDir:  moduleDir,
 		configFile: serviceConfig,
 		client:     &http.Client{Timeout: 60 * time.Second},
+		states:     make(map[string]connectionState),
 	}
 	p.reloadConfig()
 	go p.pollUpdates()
@@ -125,6 +139,8 @@ func (p *Plugin) Call(operator string, function string, argsJSON string) {
 		p.sendDestinations(operator)
 	case "status":
 		p.requestStatus(operator, argsJSON)
+	case "probe":
+		p.probe(operator, argsJSON)
 	case "upload":
 		p.upload(operator, argsJSON)
 	default:
@@ -146,8 +162,29 @@ func (p *Plugin) configPath() (string, error) {
 func (p *Plugin) reloadConfig() {
 	config, err := p.loadConfig()
 	p.mu.Lock()
+	oldToken := p.config.OperatorBotToken
 	p.config = config
 	p.configErr = err
+	if err != nil || oldToken != config.OperatorBotToken {
+		p.operator = operatorIdentity{}
+	}
+	if p.states == nil {
+		p.states = make(map[string]connectionState)
+	}
+	if err == nil {
+		configured := make(map[string]struct{}, len(config.Destinations))
+		for _, destination := range config.Destinations {
+			configured[destination.Name] = struct{}{}
+			if _, exists := p.states[destination.Name]; !exists {
+				p.states[destination.Name] = connectionState{State: "Configured"}
+			}
+		}
+		for name := range p.states {
+			if _, exists := configured[name]; !exists {
+				delete(p.states, name)
+			}
+		}
+	}
 	p.mu.Unlock()
 }
 
@@ -246,21 +283,60 @@ func (p *Plugin) destination(name string) (Config, Destination, error) {
 }
 
 func (p *Plugin) sendDestinations(operator string) {
-	config, err := p.snapshot()
+	p.mu.RLock()
+	config, err := p.config, p.configErr
+	operatorBot := p.operator
+	states := make(map[string]connectionState, len(p.states))
+	for name, state := range p.states {
+		states[name] = state
+	}
+	p.mu.RUnlock()
 	if err != nil {
 		p.send(operator, map[string]any{"type": "config", "ok": false, "message": err.Error(), "destinations": []any{}})
 		return
 	}
 	items := make([]map[string]any, 0, len(config.Destinations))
 	for _, destination := range config.Destinations {
+		state := states[destination.Name]
 		items = append(items, map[string]any{
 			"name": destination.Name, "platform": destination.Platform,
 			"bot_username": destination.TeleC2BotUsername,
+			"bot_id":       destination.TeleC2BotID, "chat_id": destination.ChatID,
+			"state": state.State, "last_seen": formatTime(state.LastSeen),
+			"last_message": state.LastMessage,
 		})
 	}
 	p.send(operator, map[string]any{
 		"type": "config", "ok": true, "destinations": items,
 		"max_file_size_bytes": int64(config.MaxFileSizeMB) * 1024 * 1024,
+		"operator_bot_id":     operatorBot.ID, "operator_bot_username": operatorBot.Username,
+	})
+}
+
+func formatTime(value time.Time) string {
+	if value.IsZero() {
+		return ""
+	}
+	return value.UTC().Format(time.RFC3339)
+}
+
+func (p *Plugin) publishConnection(destination Destination, state string, message string, seen bool) {
+	p.mu.Lock()
+	current := p.states[destination.Name]
+	current.State = state
+	if message != "" {
+		current.LastMessage = message
+	}
+	if seen {
+		current.LastSeen = time.Now()
+	}
+	p.states[destination.Name] = current
+	p.mu.Unlock()
+
+	p.sendAll(map[string]any{
+		"type": "connection", "ok": true, "destination": destination.Name,
+		"state": current.State, "last_seen": formatTime(current.LastSeen),
+		"last_message": current.LastMessage,
 	})
 }
 
@@ -291,10 +367,45 @@ func (p *Plugin) requestStatus(operator string, argsJSON string) {
 	}
 	message := "/status@" + destination.TeleC2BotUsername
 	if err := p.sendTelegramMessage(config, destination.ChatID, message); err != nil {
+		p.publishConnection(destination, "Error", err.Error(), false)
 		p.result(operator, "status", false, err.Error(), map[string]any{"destination": destination.Name})
 		return
 	}
+	p.publishConnection(destination, "Awaiting reply", "Status request sent", false)
 	p.result(operator, "status", true, "Status request sent", map[string]any{"destination": destination.Name})
+}
+
+func (p *Plugin) probe(operator string, argsJSON string) {
+	args, err := decodeArgs(argsJSON)
+	if err != nil {
+		p.result(operator, "probe", false, err.Error(), nil)
+		return
+	}
+	config, destination, err := p.destination(args.Destination)
+	if err != nil {
+		p.result(operator, "probe", false, err.Error(), nil)
+		return
+	}
+	identity, err := p.getOperatorIdentity(config)
+	if err != nil {
+		p.publishConnection(destination, "Error", err.Error(), false)
+		p.result(operator, "probe", false, err.Error(), map[string]any{"destination": destination.Name})
+		return
+	}
+	if err := p.verifyChat(config, destination.ChatID); err != nil {
+		p.publishConnection(destination, "Error", err.Error(), false)
+		p.result(operator, "probe", false, err.Error(), map[string]any{"destination": destination.Name})
+		return
+	}
+	p.mu.Lock()
+	p.operator = identity
+	p.mu.Unlock()
+	p.publishConnection(destination, "Reachable", "Operator bot and Telegram group verified", false)
+	p.result(operator, "probe", true, "Telegram operator bot and private group are reachable", map[string]any{
+		"destination":           destination.Name,
+		"operator_bot_id":       identity.ID,
+		"operator_bot_username": identity.Username,
+	})
 }
 
 func (p *Plugin) upload(operator string, argsJSON string) {
@@ -334,15 +445,39 @@ func (p *Plugin) upload(operator string, argsJSON string) {
 
 	digest := sha256.Sum256(content)
 	if err := p.sendTelegramDocument(config, destination.ChatID, filename, content); err != nil {
+		p.publishConnection(destination, "Error", err.Error(), false)
 		p.result(operator, "upload", false, err.Error(), map[string]any{"destination": destination.Name})
 		return
 	}
+	p.publishConnection(destination, "Reachable", "Telegram accepted "+filename, false)
 	p.result(operator, "upload", true, "Telegram accepted the document; waiting for TeleC2 confirmation", map[string]any{
 		"destination": destination.Name,
 		"filename":    filename,
 		"size":        len(content),
 		"sha256":      hex.EncodeToString(digest[:]),
 	})
+}
+
+func (p *Plugin) getOperatorIdentity(config Config) (operatorIdentity, error) {
+	result, err := p.telegramRequest(config, "getMe", strings.NewReader(""), "application/x-www-form-urlencoded")
+	if err != nil {
+		return operatorIdentity{}, err
+	}
+	var identity struct {
+		ID       int64  `json:"id"`
+		Username string `json:"username"`
+	}
+	if err := json.Unmarshal(result, &identity); err != nil || identity.ID <= 0 || identity.Username == "" {
+		return operatorIdentity{}, errors.New("Telegram returned an invalid operator bot identity")
+	}
+	return operatorIdentity{ID: identity.ID, Username: identity.Username}, nil
+}
+
+func (p *Plugin) verifyChat(config Config, chatID int64) error {
+	values := url.Values{}
+	values.Set("chat_id", strconv.FormatInt(chatID, 10))
+	_, err := p.telegramRequest(config, "getChat", strings.NewReader(values.Encode()), "application/x-www-form-urlencoded")
+	return err
 }
 
 func sanitizeFilename(name string) string {
@@ -494,6 +629,7 @@ func (p *Plugin) forwardUpdate(config Config, update telegramUpdate) {
 	if message == "" {
 		message = "TeleC2 sent an update"
 	}
+	p.publishConnection(*destination, "Online", message, true)
 	p.sendAll(map[string]any{
 		"type": "telec2_reply", "ok": true, "destination": destination.Name,
 		"message": message,

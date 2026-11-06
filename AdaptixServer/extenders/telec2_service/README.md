@@ -1,9 +1,11 @@
 # TeleC2 Adaptix service
 
-This local service adds a TeleC2 transfer panel to Adaptix. It can request
-TeleC2 status and send an operator-selected file through a dedicated Telegram
-operator bot. It does not execute uploaded files or expose TeleC2's `/run`
-command.
+This local service adds a native TeleC2 connections panel to Adaptix. It shows
+configured Linux, Windows, and macOS destinations in a connection table, keeps
+a separate console transcript for each destination, verifies Telegram access,
+requests TeleC2 status, and sends an operator-selected file through a dedicated
+Telegram operator bot. It does not execute uploaded files or expose TeleC2's
+`/run` command.
 
 ## Telegram setup
 
@@ -37,8 +39,18 @@ extenders:
   - "extenders/telec2_service/config.yaml"
 ```
 
-Restart the server and client. Open the **TeleC2** dock, select a destination,
-choose a file, review the size confirmation, and click **Upload**.
+Restart the server and client, then open the **TeleC2** dock:
+
+- **Connections** shows platform, bot identity, connection state, and the last
+  real TeleC2 reply time.
+- **Console** keeps status and reply history isolated per destination.
+- **Transfer** selects and uploads a file after an explicit confirmation.
+- **Health & Setup** explains the selected connection and verifies the operator
+  bot token and Telegram group access without returning the token to the client.
+
+Bot creation, Bot-to-Bot Communication Mode, and Group Privacy Mode remain
+one-time BotFather administration. Routine verification, status, transfers,
+and replies are handled inside Adaptix.
 
 The Telegram hosted Bot API limits files downloaded by TeleC2 to 20 MiB. The
 service verifies the configured limit before sending and reports the SHA-256

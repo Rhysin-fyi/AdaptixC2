@@ -7,7 +7,21 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 )
+
+type recordingTeamserver struct {
+	all    []string
+	client []string
+}
+
+func (r *recordingTeamserver) TsServiceSendDataAll(service string, data string) {
+	r.all = append(r.all, data)
+}
+
+func (r *recordingTeamserver) TsServiceSendDataClient(operator string, service string, data string) {
+	r.client = append(r.client, data)
+}
 
 func validTestConfig() Config {
 	return Config{
@@ -80,5 +94,50 @@ func TestLoadConfigRequiresPrivatePermissions(t *testing.T) {
 	}
 	if _, err := plugin.loadConfig(); err != nil {
 		t.Fatalf("loadConfig with mode 0600 returned error: %v", err)
+	}
+}
+
+func TestSendDestinationsIncludesConnectionStateWithoutToken(t *testing.T) {
+	teamserver := &recordingTeamserver{}
+	config := validTestConfig()
+	plugin := &Plugin{
+		ts:     teamserver,
+		config: config,
+		states: map[string]connectionState{
+			"lab-linux": {
+				State:       "Online",
+				LastSeen:    time.Date(2026, 11, 6, 12, 0, 0, 0, time.UTC),
+				LastMessage: "ready",
+			},
+		},
+	}
+
+	plugin.sendDestinations("operator1")
+	if len(teamserver.client) != 1 {
+		t.Fatalf("client messages = %d, want 1", len(teamserver.client))
+	}
+	message := teamserver.client[0]
+	if strings.Contains(message, config.OperatorBotToken) {
+		t.Fatal("destination response exposed the operator bot token")
+	}
+	for _, expected := range []string{`"state":"Online"`, `"last_message":"ready"`, `"bot_id":123456789`} {
+		if !strings.Contains(message, expected) {
+			t.Fatalf("destination response %q does not contain %q", message, expected)
+		}
+	}
+}
+
+func TestPublishConnectionRecordsLastSeenAndBroadcasts(t *testing.T) {
+	teamserver := &recordingTeamserver{}
+	destination := validTestConfig().Destinations[0]
+	plugin := &Plugin{ts: teamserver, states: make(map[string]connectionState)}
+
+	plugin.publishConnection(destination, "Online", "ready", true)
+	state := plugin.states[destination.Name]
+	if state.State != "Online" || state.LastMessage != "ready" || state.LastSeen.IsZero() {
+		t.Fatalf("connection state = %#v", state)
+	}
+	if len(teamserver.all) != 1 || !strings.Contains(teamserver.all[0], `"type":"connection"`) {
+		t.Fatalf("broadcast messages = %#v", teamserver.all)
 	}
 }
