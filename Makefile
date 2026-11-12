@@ -153,6 +153,33 @@ fedora-run:
 	@ ./run-adaptix.sh
 
 
+### DEBIAN / KALI BUILD ###
+
+debian-client:
+	@ ./scripts/build-debian.sh client
+
+debian-server:
+	@ ./scripts/build-debian.sh server
+
+debian-extenders:
+	@ ./scripts/build-debian.sh extenders
+
+debian-server-ext:
+	@ ./scripts/build-debian.sh server-ext
+
+debian-all:
+	@ ./scripts/build-debian.sh all
+
+debian-deps:
+	@ ./scripts/setup-debian.sh build
+
+debian-install:
+	@ ./install-debian.sh
+
+debian-run:
+	@ ./run-adaptix.sh
+
+
 
 ### DOCKER RUNTIME ###
 
@@ -212,8 +239,18 @@ help:
 	@ echo "  fedora-install        - Build and create a local installation"
 	@ echo "  fedora-run            - Start the local server and client"
 	@ echo ""
+	@ echo "Debian/Kali commands:"
+	@ echo "  debian-deps          - Install host build/runtime dependencies"
+	@ echo "  debian-client        - Build the client AppImage with Podman/Docker"
+	@ echo "  debian-server        - Build the server with Podman/Docker"
+	@ echo "  debian-extenders     - Build extenders with Podman/Docker"
+	@ echo "  debian-server-ext    - Build server and extenders"
+	@ echo "  debian-all           - Build server, extenders, and client"
+	@ echo "  debian-install       - Install dependencies, build, and install locally"
+	@ echo "  debian-run           - Start the local server and client"
+	@ echo ""
 	@ echo "  help             - Show this help message"
 	@ echo ""
 	@ echo "Platform: $(UNAME_S) [$(NPROC) proc]"
 
-.PHONY: all extenders server-ext server client clean clean-all docker-build-server docker-build-extenders docker-build-server-ext docker-build-all docker-up docker-down docker-logs docker-restart docker-clean docker-clean-all fedora-client fedora-server fedora-extenders fedora-server-ext fedora-all fedora-install fedora-run help prepare
+.PHONY: all extenders server-ext server client clean clean-all docker-build-server docker-build-extenders docker-build-server-ext docker-build-all docker-up docker-down docker-logs docker-restart docker-clean docker-clean-all fedora-client fedora-server fedora-extenders fedora-server-ext fedora-all fedora-install fedora-run debian-client debian-server debian-extenders debian-server-ext debian-all debian-deps debian-install debian-run help prepare

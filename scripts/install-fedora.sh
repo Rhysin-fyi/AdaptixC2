@@ -75,7 +75,7 @@ fi
 [[ -x "$client_source" ]] || fail "missing client build: $client_source"
 [[ -x "$server_source/adaptixserver" ]] || fail "missing server build: $server_source/adaptixserver"
 [[ -d "$server_source/extenders" ]] || fail "missing built extenders: $server_source/extenders"
-command -v openssl >/dev/null 2>&1 || fail "install OpenSSL with: sudo dnf install openssl"
+command -v openssl >/dev/null 2>&1 || fail "OpenSSL is required (Debian/Kali: sudo apt install openssl; Fedora: sudo dnf install openssl)"
 
 client_dir="$install_dir/client"
 server_dir="$install_dir/server"

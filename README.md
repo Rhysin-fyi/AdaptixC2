@@ -26,6 +26,16 @@ unique generated password. Before logging in, read the connection details with
 `cat install/connection.txt`; with the generated password-only profile, the
 client nickname may be any value.
 
+### Debian and Kali
+
+See [DEBIAN.md](DEBIAN.md) for the Debian/Kali dependency, build, installation,
+and launcher workflow. The easiest path installs required APT packages, builds
+inside Podman or Docker, and creates the same protected local installation:
+
+```bash
+./install-debian.sh
+```
+
 
 
 ## Features
@@ -61,7 +71,7 @@ client nickname may be any value.
 
 ## TeleC2 Transfer Panel
 
-The local Fedora branch includes an optional TeleC2 service dock for sending an
+The local Linux branch includes an optional TeleC2 service dock for sending an
 operator-selected file to an authorized TeleC2 endpoint through a dedicated
 Telegram operator bot. The panel shows the destination platform, file size,
 confirmation prompt, upload result, SHA-256 digest and TeleC2 replies without

@@ -77,18 +77,23 @@ stop_server() {
 }
 
 require_server() {
-    [[ -x "$server_bin" ]] || fail "server is not installed; run ./install-fedora.sh"
+    [[ -x "$server_bin" ]] || fail "server is not installed; run ./install-fedora.sh or ./install-debian.sh"
     [[ -f "$profile" ]] || fail "missing server profile: $profile"
     command -v openssl >/dev/null 2>&1 || fail "OpenSSL is required to check server readiness"
 }
 
 require_client() {
-    [[ -x "$client_bin" ]] || fail "client is not installed; run ./install-fedora.sh"
+    [[ -x "$client_bin" ]] || fail "client is not installed; run ./install-fedora.sh or ./install-debian.sh"
 }
 
 run_client() {
     printf '[*] Opening Adaptix client...\n'
-    QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-xcb}" "$client_bin"
+    if command -v ldconfig >/dev/null 2>&1 && ldconfig -p 2>/dev/null | grep -q 'libfuse\.so\.2'; then
+        QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-xcb}" "$client_bin"
+    else
+        printf '[*] FUSE 2 is unavailable; using AppImage extract-and-run mode.\n'
+        QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-xcb}" "$client_bin" --appimage-extract-and-run
+    fi
 }
 
 run_server_foreground() {
