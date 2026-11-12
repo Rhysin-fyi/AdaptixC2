@@ -132,7 +132,19 @@ else
 fi
 
 telec2_config='extenders/telec2_service/config.yaml'
-if [[ -f "$server_dir/$telec2_config" ]] &&
+telec2_complete=true
+for telec2_file in \
+    "$server_dir/$telec2_config" \
+    "$server_dir/extenders/telec2_service/telec2_service.so" \
+    "$server_dir/extenders/telec2_service/telec2.axs" \
+    "$server_dir/extenders/telec2_service/telec2-config.json"; do
+    if [[ ! -f "$telec2_file" ]]; then
+        telec2_complete=false
+        break
+    fi
+done
+
+if [[ "$telec2_complete" == true ]] &&
    ! grep -Eq '^[[:space:]]*-[[:space:]]*"extenders/telec2_service/config\.yaml"[[:space:]]*$' "$server_dir/profile.yaml"; then
     if grep -Eq '^[[:space:]]*extenders:[[:space:]]*$' "$server_dir/profile.yaml"; then
         sed -i '/^[[:space:]]*extenders:[[:space:]]*$/a\    - "extenders/telec2_service/config.yaml"' "$server_dir/profile.yaml"
@@ -140,6 +152,10 @@ if [[ -f "$server_dir/$telec2_config" ]] &&
     else
         printf '[!] TeleC2 service was built but the profile has no extenders section; add %s manually.\n' "$telec2_config" >&2
     fi
+elif [[ "$telec2_complete" == false ]] &&
+     grep -Eq '^[[:space:]]*-[[:space:]]*"extenders/telec2_service/config\.yaml"[[:space:]]*$' "$server_dir/profile.yaml"; then
+    sed -i '\#^[[:space:]]*-[[:space:]]*"extenders/telec2_service/config\.yaml"[[:space:]]*$#d' "$server_dir/profile.yaml"
+    printf '[!] TeleC2 runtime bundle is incomplete; disabled it in the server profile.\n' >&2
 fi
 
 only_password="$(awk '/^[[:space:]]*only_password:/ {print $2; exit}' "$server_dir/profile.yaml")"

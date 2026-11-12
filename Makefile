@@ -55,11 +55,17 @@ EXTENDER_DIRS := $(shell find AdaptixServer/extenders -maxdepth 1 -type d -not -
 extenders: prepare
 	@ echo "[*] Building default extenders"
 	@ mkdir -p $(DIST_DIR)/extenders
-	@ for dir in $(EXTENDER_DIRS); do \
+	@ set -e; for dir in $(EXTENDER_DIRS); do \
+		echo "    * Building $$(basename $$dir)"; \
 		(cd $$dir && $(MAKE) --no-print-directory); \
 		plugin_name=$$(basename $$dir); \
+		test -d $$dir/dist || { echo "[ERROR] Missing build output: $$dir/dist" >&2; exit 1; }; \
+		rm -rf $(DIST_DIR)/extenders/$$plugin_name; \
 		mv $$dir/dist $(DIST_DIR)/extenders/$$plugin_name; \
 	done
+	@ test -f $(DIST_DIR)/extenders/telec2_service/config.yaml || { echo "[ERROR] TeleC2 config was not built" >&2; exit 1; }
+	@ test -f $(DIST_DIR)/extenders/telec2_service/telec2_service.so || { echo "[ERROR] TeleC2 plugin was not built" >&2; exit 1; }
+	@ test -f $(DIST_DIR)/extenders/telec2_service/telec2.axs || { echo "[ERROR] TeleC2 client script was not built" >&2; exit 1; }
 	@ echo "[+] done"
 
 

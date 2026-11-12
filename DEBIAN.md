@@ -43,6 +43,12 @@ are preserved, a first-run local password and TLS certificate are generated,
 the built Extension Kit is copied when present, and the private TeleC2
 configuration is retained.
 
+The build now stops immediately if any extender fails or omits its runtime
+artifacts. As an additional safeguard, the installer enables TeleC2 only when
+its config, shared plugin, client script, and private runtime configuration are
+all present. Rerunning the installer repairs an older profile that references
+an incomplete TeleC2 bundle.
+
 Display the generated connection details, then start both components:
 
 ```bash
